@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "evaluation": "ordered-first-match",
+  "policies": [
+    { "policy_id": "DLP-SECRET-001", "when": "secret_detected", "decision": "BLOCK" },
+    { "policy_id": "DLP-EXT-001", "when": "external AND HIGHLY_CONFIDENTIAL", "decision": "BLOCK" },
+    { "policy_id": "DLP-PII-001", "when": "high_risk_pii", "decision": "REDACT" },
+    { "policy_id": "DLP-EXT-002", "when": "external AND CONFIDENTIAL", "decision": "REQUIRE_APPROVAL" },
+    { "policy_id": "DLP-INTERNAL-001", "when": "internal AND authorized_role", "decision": "ALLOW" }
+  ]
+}
