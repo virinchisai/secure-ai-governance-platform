@@ -1,0 +1,18 @@
+{
+  "event_id": "sample-event-001",
+  "timestamp": "2026-01-01T12:00:00Z",
+  "request_id": "sample-request-001",
+  "user_id": "synthetic-user",
+  "workspace_id": "synthetic-workspace",
+  "action": "email.prepare",
+  "tool": "send_email",
+  "resource": "external@example.test",
+  "classification": "HIGHLY_CONFIDENTIAL",
+  "policy_decision": "BLOCK",
+  "policy_id": "DLP-EXT-001",
+  "approval_id": null,
+  "result": "blocked",
+  "risk_score": 0,
+  "reason": "Highly confidential data cannot be shared externally.",
+  "event_type": "sensitive_data_external_share_attempt"
+}

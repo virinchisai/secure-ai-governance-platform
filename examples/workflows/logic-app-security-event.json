@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "source": "secure-ai-governance-platform",
+  "event_type": "prompt_injection_detected",
+  "severity": "high",
+  "workspace_id": "synthetic-workspace",
+  "event_id": "sample-event-002",
+  "timestamp": "2026-01-01T12:00:00Z",
+  "data": {
+    "request_id": "sample-request-002",
+    "action": "content.inspect",
+    "policy_id": null,
+    "policy_decision": null,
+    "risk_score": 20,
+    "result": "detected"
+  }
+}
