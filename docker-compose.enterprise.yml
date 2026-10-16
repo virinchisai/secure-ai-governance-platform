@@ -1,0 +1,80 @@
+services:
+  api:
+    environment:
+      IDENTITY_MODE: local
+      OIDC_ISSUER: http://localhost:8080/realms/governance
+      OIDC_AUDIENCE: governance-api
+      OIDC_JWKS_URL: http://keycloak:8080/realms/governance/protocol/openid-connect/certs
+      POLICY_PROVIDER: opa
+      OPA_URL: http://opa:8181/v1/data/governance/dlp/decision
+      CLASSIFIER_PROVIDER: presidio
+      PRESIDIO_URL: http://presidio-analyzer:3000
+      OPENSEARCH_URL: http://opensearch:9200
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+      presidio-analyzer:
+        condition: service_started
+      opensearch:
+        condition: service_healthy
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: local-admin-change-me
+    ports: ["8080:8080"]
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/governance-realm.json:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/governance HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  opa:
+    image: openpolicyagent/opa:1.10.1
+    command:
+      ["run", "--server", "--addr=0.0.0.0:8181", "--log-format=json", "/policies"]
+    ports: ["8181:8181"]
+    volumes:
+      - ./policies:/policies:ro
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "true"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  presidio-analyzer:
+    image: ghcr.io/data-privacy-stack/presidio-analyzer:latest
+    ports: ["5001:3000"]
+
+  opensearch:
+    image: opensearchproject/opensearch:3.4.0
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["9200:9200"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3.4.0
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    ports: ["5601:5601"]
+    depends_on:
+      opensearch:
+        condition: service_healthy

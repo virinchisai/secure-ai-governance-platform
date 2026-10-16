@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_DB: governance
       POSTGRES_USER: governance
@@ -32,6 +32,9 @@ services:
       JWT_SECRET: docker-local-secret-change-before-shared-use
       GRAPH_PROVIDER: local
       AI_PROVIDER: mock
+      PERSISTENCE_MODE: database
+      RAG_MODE: postgres
+      EMBEDDING_PROVIDER: hash
     ports: ["8000:8000"]
     depends_on:
       postgres:

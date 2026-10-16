@@ -8,7 +8,9 @@ RUN useradd --create-home --uid 10001 appuser
 WORKDIR /app
 COPY pyproject.toml ./
 COPY apps ./apps
+COPY alembic.ini ./
+COPY migrations ./migrations
 RUN pip install --no-cache-dir .
 USER appuser
 EXPOSE 8000
-CMD ["uvicorn", "apps.api.governance.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn apps.api.governance.main:app --host 0.0.0.0 --port 8000"]

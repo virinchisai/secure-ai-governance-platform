@@ -27,3 +27,8 @@ Confidence expresses rule confidence, not measured ML accuracy. No accuracy metr
 7. `DLP-DEFAULT-000`: deny if no allow rule matches.
 
 Every result includes decision, policy ID, matching rule, reason, and affected entity types.
+
+The same main sharing decisions are represented in Rego under `policies/governance/`. Setting
+`POLICY_PROVIDER=opa` sends structured classification metadata—not document content—to the local OPA
+decision endpoint. Transport or response-schema errors fail closed. The default remains the local
+engine so the project works without a policy service.

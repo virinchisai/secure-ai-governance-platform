@@ -9,8 +9,11 @@ No Microsoft tenant or credentials are configured. M365-like files and email are
 
 `IdentityProvider` defines the boundary. `LocalIdentityProvider` implements demo authentication;
 `MicrosoftEntraProvider` deliberately rejects password authentication and reserves an OIDC
-authorization-code flow. A real integration must validate issuer, audience, nonce/state, signature,
-expiration, tenant allowlist, group/role mapping, conditional access expectations, and key rotation.
+authorization-code flow. `OIDCTokenVerifier` implements RS256 signature/JWKS, issuer, audience,
+expiry, subject, recognized-role, and workspace-claim validation and can be exercised with the local
+Keycloak lab. The browser authorization-code/PKCE redirect flow is not implemented. A real Entra
+integration still needs tenant allowlisting, group/app-role design, state/nonce handling in the
+client flow, conditional-access validation, consent review, and operational key-rotation testing.
 
 ## Microsoft Graph
 

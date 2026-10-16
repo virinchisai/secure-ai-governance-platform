@@ -19,6 +19,34 @@ class AuditSink:
         raise NotImplementedError
 
 
+class ForwardingAuditSink(AuditSink):
+    """Persist locally first, then forward the normalized event to a SIEM adapter."""
+
+    def __init__(
+        self,
+        primary: AuditSink,
+        forwarder: Callable[[dict[str, object]], None],
+    ) -> None:
+        self.primary = primary
+        self.forwarder = forwarder
+
+    def emit(self, event: AuditEvent) -> None:
+        self.primary.emit(event)
+        payload = json.loads(event.model_dump_json())
+        try:
+            self.forwarder(payload)
+        except RuntimeError as exc:
+            logger.error(
+                "security_event_forwarding_failed",
+                event_id=event.event_id,
+                workspace_id=event.workspace_id,
+                error_type=type(exc).__name__,
+            )
+
+    def list_events(self, workspace_id: str) -> list[AuditEvent]:
+        return self.primary.list_events(workspace_id)
+
+
 class InMemoryAuditSink(AuditSink):
     def __init__(self, forwarder: Callable[[dict[str, object]], None] | None = None) -> None:
         self._events: list[AuditEvent] = []

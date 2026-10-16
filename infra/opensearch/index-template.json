@@ -1,0 +1,26 @@
+{
+  "index_patterns": ["governance-security-events*"],
+  "template": {
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "event_id": { "type": "keyword" },
+        "timestamp": { "type": "date" },
+        "request_id": { "type": "keyword" },
+        "user_id": { "type": "keyword" },
+        "workspace_id": { "type": "keyword" },
+        "action": { "type": "keyword" },
+        "tool": { "type": "keyword" },
+        "resource": { "type": "keyword" },
+        "classification": { "type": "keyword" },
+        "policy_decision": { "type": "keyword" },
+        "policy_id": { "type": "keyword" },
+        "approval_id": { "type": "keyword" },
+        "result": { "type": "keyword" },
+        "risk_score": { "type": "integer" },
+        "reason": { "type": "text" },
+        "event_type": { "type": "keyword" }
+      }
+    }
+  }
+}

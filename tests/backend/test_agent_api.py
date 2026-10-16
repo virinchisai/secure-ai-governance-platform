@@ -71,6 +71,21 @@ def test_login_and_document_api_are_authenticated(client: TestClient) -> None:
     assert all(document["workspace_id"] == "acme-labs" for document in response.json())
 
 
+def test_knowledge_api_is_tenant_scoped_and_audited(client: TestClient) -> None:
+    headers = login(client)
+    response = client.post(
+        "/api/knowledge/search",
+        headers=headers,
+        json={"query": "other tenant document", "limit": 20},
+    )
+    assert response.status_code == 200
+    assert response.json()
+    assert {item["workspace_id"] for item in response.json()} == {"acme-labs"}
+    assert all(item["document_id"] != "other-tenant-document" for item in response.json())
+    events = client.get("/api/audit", headers=headers).json()
+    assert any(event["event_type"] == "document_search" for event in events)
+
+
 def test_invalid_login_rejected(client: TestClient) -> None:
     response = client.post(
         "/api/auth/login", json={"username": "analyst@acme.test", "password": "wrong"}

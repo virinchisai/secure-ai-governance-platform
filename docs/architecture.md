@@ -17,7 +17,7 @@
 
 | Module | Owns |
 |---|---|
-| `identity.py` | PBKDF2 local authentication, identity contracts, JWT issue/verify |
+| `identity.py` | PBKDF2 local authentication, local JWTs, OIDC/JWKS verification |
 | `rbac.py` | role-to-tool allowlist and workspace boundary |
 | `classification.py` | entity detection, levels, labels, redaction |
 | `dlp.py` | deterministic ordered sharing and content policy |
@@ -27,6 +27,11 @@
 | `connectors.py` | Graph contract, local simulator, named-query database |
 | `audit.py` / `risk.py` | normalized events and explainable behavior signals |
 | `cache.py` | authorization-scoped cache key and sensitive bypass |
+| `persistence.py` / `migrations/` | durable audit and atomic approval state |
+| `rag.py` | workspace-filtered local and pgvector knowledge retrieval |
+| `policy_adapters.py` | fail-closed OPA policy decision adapter |
+| `classifier_adapters.py` | local rules plus optional Presidio analysis |
+| `siem.py` | allowlisted OpenSearch event forwarding |
 | `azure.py` | deployment-neutral Azure workflow payload mapping |
 
 ## Core request sequence
@@ -43,6 +48,8 @@
 
 ## Persistence
 
-`persistence.py` provides a SQLAlchemy audit model and sink. The default runtime deliberately uses an
-in-memory sink for zero-setup tests and demos. PostgreSQL is present in Compose as the production-like
-database target, but durable repositories and migrations remain a stated hardening gap.
+Local Python execution defaults to in-memory state for zero-setup tests. Compose sets
+`PERSISTENCE_MODE=database`, runs Alembic before API startup, and stores approval/audit state in
+PostgreSQL. Approval transitions use an expected-status update so concurrent replay has one winner.
+The pgvector query applies the workspace predicate in SQL before ranking; local retrieval applies the
+same boundary before scoring. Migrations have explicit upgrade and downgrade paths.

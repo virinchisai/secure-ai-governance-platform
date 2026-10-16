@@ -82,6 +82,10 @@ mitigation, and regression proof in [docs/threat-model.md](docs/threat-model.md)
 - Insider-risk style explainable behavioral rules
 - Local Graph files/email plus a fail-closed Microsoft Graph adapter seam
 - Authorization-scoped expiring cache with sensitive-response bypass
+- Alembic-managed PostgreSQL approval/audit persistence with atomic approval consumption
+- Tenant-filtered pgvector retrieval with deterministic local or optional Ollama embeddings
+- Optional Keycloak OIDC, OPA policy, Presidio analysis, and OpenSearch event adapters
+- Measured adversarial prompt corpus runner and policy-as-code regression tests
 - Prometheus endpoint, request IDs, structured JSON logging, audit schema, and SIEM examples
 - Enterprise Next.js console across workspace, documents, classification, DLP, approvals, risk,
   audit, security events, and integration settings
@@ -89,9 +93,9 @@ mitigation, and regression proof in [docs/threat-model.md](docs/threat-model.md)
 ## 7. Tech stack
 
 - Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, PyJWT, structlog, Prometheus client
-- PostgreSQL 17 in Compose; SQLite-compatible SQLAlchemy persistence adapter for local use
+- PostgreSQL 17 with pgvector in Compose; SQLite-compatible security-state persistence for tests
 - Next.js 16, React 19, TypeScript 5, CSS without a component framework
-- pytest, Ruff, mypy, Bandit, ESLint, npm audit, CodeQL, Dependabot
+- pytest, Ruff, mypy, Bandit, ESLint, npm audit, CodeQL, Dependabot, Gitleaks, Semgrep, Trivy
 - Optional local Ollama adapter; deterministic mock AI is the default
 
 ## 8. Local setup
@@ -123,6 +127,16 @@ For a one-command container demo:
 docker compose up --build
 ```
 
+The base stack keeps local JWT, policy/classification, and mock AI while enabling durable
+PostgreSQL state and pgvector retrieval. To run the optional free enterprise lab services:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.enterprise.yml up --build
+```
+
+That overlay starts Keycloak, OPA, Presidio Analyzer, OpenSearch, and OpenSearch Dashboards. It is a
+local integration lab, not a production deployment. See [docs/enterprise-stack.md](docs/enterprise-stack.md).
+
 ## 9. Demo walkthrough
 
 1. Sign in as the synthetic analyst.
@@ -143,8 +157,11 @@ integration status cards.
 .venv/bin/ruff format --check apps tests
 .venv/bin/ruff check apps tests
 .venv/bin/mypy apps/api/governance
+.venv/bin/alembic upgrade head
 .venv/bin/pytest --cov=apps.api.governance
 .venv/bin/bandit -r apps/api/governance -x tests
+.venv/bin/python scripts/run_security_evals.py
+docker run --rm -v "$PWD/policies:/policies:ro" openpolicyagent/opa:1.10.1 test /policies
 cd apps/web
 npm run lint
 npm run typecheck
@@ -197,8 +214,8 @@ fabricated metric.
 Sensitive actions emit a normalized JSON schema containing event/request IDs, timestamp, identity,
 workspace, action/tool/resource, classification, policy decision/ID, approval ID, result, risk score,
 reason, and event type. Raw document or email bodies are excluded. A sample event and Azure-style
-workflow envelope live under `examples/`. Forwarding is adapter-based for future Splunk, Sentinel,
-Elastic, or another SIEM; none is connected by default.
+workflow envelope live under `examples/`. An optional OpenSearch adapter indexes an allowlist of
+event metadata; no SIEM is connected by default. Other SIEM adapters remain future work.
 
 ## 17. Microsoft integration architecture
 
@@ -215,33 +232,37 @@ describe local concepts only. They are not product integration claims.
 
 | Status | Capabilities |
 |---|---|
-| Implemented | Local identity/JWT/RBAC, tenant checks, classification, DLP, injection defenses, bounded tools, approvals, audit events, SIEM schema, risk rules, scoped cache, API, UI, metrics, tests |
-| Simulated | M365-like documents and mail, synthetic identities/data, behavioral event history, model summaries |
-| Integration-ready | Microsoft Graph interface, Entra OIDC interface, Ollama adapter, Azure Function/Logic App payloads, SIEM forwarding callback, PostgreSQL Compose service |
+| Implemented | Local identity/JWT/RBAC, OIDC/JWKS validation, tenant checks, classification, DLP, injection defenses, bounded tools, durable approvals/audit, SIEM schema, risk rules, scoped cache, tenant-safe vector retrieval, API, UI, metrics, tests |
+| Simulated | M365-like documents and mail, synthetic identities/data, behavioral event history, deterministic model summaries, hash embeddings |
+| Integration-ready | Microsoft Graph interface, Entra OIDC architecture, Ollama adapter, Azure Function/Logic App payloads, Keycloak/OPA/Presidio/OpenSearch local lab |
 | Not implemented | Live Purview, live Entra/Graph/M365, Copilot Studio, Azure AI Foundry, live Azure workflows, external cloud model calls, production SIEM ingestion |
 
 ## 19. Limitations and production hardening
 
-- In-memory approvals, risk counters, cache, and the default audit sink are single-process demo state.
+- Risk counters and cache remain single-process demo state; approvals/audit are durable when
+  `PERSISTENCE_MODE=database` (the Compose default).
 - Local demo credentials are public synthetic fixtures and must not be used in a deployment.
 - Regex classification has expected false positives/negatives and needs governed detectors.
-- JWT uses a local symmetric secret; production should validate an OIDC issuer's rotating keys.
+- Local JWT uses a symmetric secret; optional OIDC mode validates RS256 signatures, issuer,
+  audience, expiry, roles, workspace context, and rotating JWKS.
 - Connector calls need workload identity, least-privilege consent, retry/idempotency, and egress policy.
-- Approval authorization needs durable transactions and separation-of-duties rules.
+- Approval persistence uses atomic status transitions; production still needs explicit
+  separation-of-duties policy, database authorization, and high-availability testing.
 - Audit storage needs append-only controls, retention, access review, integrity, and delivery guarantees.
 - Behavioral thresholds need baselining, privacy review, case management, and false-positive handling.
 - Secrets need a managed vault; TLS, rate limiting, CSRF strategy, CSP, WAF, backups, and disaster
   recovery are deployment responsibilities.
-- PostgreSQL schema migrations and Redis-backed distributed cache are not wired into the demo runtime.
+- OpenSearch forwarding is synchronous and needs a durable queue, retry/dead-letter handling,
+  authentication, and TLS before production use.
+- Local hash embeddings are deterministic test vectors, not a claim of semantic quality.
 
 ## 20. Roadmap
 
-1. Durable PostgreSQL repositories and Alembic migrations for approvals, audit, and risk state.
-2. Redis cache with envelope encryption and explicit invalidation on authorization changes.
-3. Real Entra OIDC validation and Graph adapter behind tenant-specific feature flags.
-4. Policy-as-code packaging, versioning, approval, simulation, and rollback.
-5. Signed SIEM delivery with retry/dead-letter behavior and end-to-end tracing.
-6. Adversarial corpus evaluation and classifier performance reporting based only on measured results.
+1. Persist risk state and add a Redis cache with envelope encryption and authorization invalidation.
+2. Complete a consent-reviewed Microsoft Graph implementation against a dedicated test tenant.
+3. Add policy bundle signing, version approval, simulation, and rollback governance.
+4. Add queued SIEM delivery with authentication, retry/dead-letter behavior, and tracing.
+5. Expand adversarial coverage and report only reproducible evaluator/classifier measurements.
 
 ## Portfolio skill mapping
 

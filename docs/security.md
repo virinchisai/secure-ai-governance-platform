@@ -31,3 +31,9 @@ approved/rejected and approved to consumed; expired, rejected, and consumed gran
 Providers default to `local` Graph and `mock` AI. Missing Microsoft credentials fail closed.
 Arbitrary SQL is rejected in favor of named queries. CORS allows only the local UI origin, response
 request IDs are bounded, and containers run as non-root users.
+
+Optional OIDC mode validates RS256 signatures against issuer JWKS and requires issuer, audience,
+expiry, subject, a recognized role, and workspace context. Optional OPA failure denies policy
+evaluation rather than falling back to a weaker rule set. Presidio augments rather than replaces
+local secret detection. Vector search filters by workspace before similarity ranking. OpenSearch
+receives only allowlisted audit metadata, never document or email bodies.

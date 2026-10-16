@@ -6,6 +6,7 @@ import hmac
 import os
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
 
 import jwt
 
@@ -60,6 +61,47 @@ class MicrosoftEntraProvider(IdentityProvider):
         raise AuthenticationError(
             "Direct password authentication is disabled for Microsoft Entra; "
             "configure OIDC authorization code flow"
+        )
+
+
+class TokenVerifier(Protocol):
+    def verify(self, token: str) -> UserContext: ...
+
+
+class OIDCTokenVerifier:
+    """Validates third-party OIDC access tokens against issuer JWKS."""
+
+    def __init__(self, issuer: str, audience: str, jwks_url: str | None = None) -> None:
+        self.issuer = issuer.rstrip("/")
+        self.audience = audience
+        self._jwks = jwt.PyJWKClient(jwks_url or f"{self.issuer}/protocol/openid-connect/certs")
+
+    def verify(self, token: str) -> UserContext:
+        try:
+            key = self._jwks.get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token,
+                key.key,
+                algorithms=["RS256"],
+                audience=self.audience,
+                issuer=self.issuer,
+                options={"require": ["exp", "iat", "sub"]},
+            )
+            return self._context_from_claims(claims)
+        except (jwt.PyJWTError, KeyError, ValueError) as exc:
+            raise AuthenticationError("Invalid or expired OIDC token") from exc
+
+    @staticmethod
+    def _context_from_claims(claims: dict[str, Any]) -> UserContext:
+        workspace_id = claims.get("workspace_id") or claims.get("tenant_id")
+        if not workspace_id:
+            raise AuthenticationError("OIDC token is missing workspace context")
+        raw_roles = claims.get("roles") or claims.get("realm_access", {}).get("roles", [])
+        known_roles = frozenset(Role(role) for role in raw_roles if role in set(Role))
+        if not known_roles:
+            raise AuthenticationError("OIDC token has no recognized governance role")
+        return UserContext(
+            user_id=str(claims["sub"]), workspace_id=str(workspace_id), roles=known_roles
         )
 
 

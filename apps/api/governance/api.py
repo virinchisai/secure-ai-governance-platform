@@ -15,13 +15,14 @@ from .domain import (
     Role,
     UserContext,
 )
-from .identity import AuthenticationError
+from .identity import AuthenticationError, TokenService
 from .rbac import AuthorizationError
 from .runtime import Runtime
 from .schemas import (
     ApprovalDecisionRequest,
     ApprovalExecutionRequest,
     ClassificationRequest,
+    KnowledgeSearchRequest,
     LoginRequest,
     SafeQueryRequest,
     SummaryEmailRequest,
@@ -50,6 +51,11 @@ def current_user(
 
 @router.post("/auth/login", response_model=TokenResponse)
 def login(body: LoginRequest, services: Annotated[Runtime, Depends(runtime)]) -> TokenResponse:
+    if not isinstance(services.tokens, TokenService):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Local password login is disabled; use the configured OIDC authorization flow",
+        )
     try:
         context = services.identity.authenticate(body.username, body.password)
     except AuthenticationError as exc:
@@ -96,6 +102,34 @@ def classify(
     services: Annotated[Runtime, Depends(runtime)],
 ) -> ClassificationResult:
     return services.classifier.classify(body.content)
+
+
+@router.post("/knowledge/search")
+def search_knowledge(
+    body: KnowledgeSearchRequest,
+    request: Request,
+    context: Annotated[UserContext, Depends(current_user)],
+    services: Annotated[Runtime, Depends(runtime)],
+) -> list[dict[str, object]]:
+    services.authorizer.authorize_tool(context, "search_documents")
+    chunks = services.knowledge.search(context.workspace_id, body.query, body.limit)
+    for _chunk in chunks:
+        services.risk.record(context.user_id, "document_access")
+    services.audit.emit(
+        AuditEvent(
+            request_id=request.state.request_id,
+            user_id=context.user_id,
+            workspace_id=context.workspace_id,
+            action="knowledge.search",
+            tool="search_documents",
+            resource=f"result_count:{len(chunks)}",
+            result="allowed",
+            risk_score=services.risk.assess(context.user_id).score,
+            reason="Workspace-filtered knowledge search completed",
+            event_type="document_search",
+        )
+    )
+    return [chunk.model_dump() for chunk in chunks]
 
 
 @router.post("/agent/summarize-email")
